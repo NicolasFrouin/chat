@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { ChatsService } from './chats.service';
 import { Logger } from '@nestjs/common';
 import { CreateChatDto } from './dto/create-chat.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @WebSocketGateway({
   cors: {
@@ -22,6 +23,7 @@ export class ChatsGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   private logger: Logger = new Logger('ChatsGateway');
+  private readonly connectedUsers = new Map<string, string>(); // Map socket.id to user.id
 
   @WebSocketServer()
   server: Server;
@@ -32,12 +34,116 @@ export class ChatsGateway
     this.logger.log('WebSocket Gateway Initialized');
   }
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
+    // Send initial data to the newly connected client
+    await this.findAll().then((chats) => {
+      client.emit('chats', chats);
+    });
   }
 
   handleDisconnect(client: Socket) {
+    // Remove user from connected users map
+    const userId = this.connectedUsers.get(client.id);
+    if (userId) {
+      this.connectedUsers.delete(client.id);
+      this.logger.log(`User disconnected: ${userId}`);
+
+      // Broadcast user left message
+      this.server.emit('userLeft', { userId });
+    }
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  @SubscribeMessage('createUser')
+  async createUser(
+    @MessageBody() createUserDto: CreateUserDto,
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      const user = await this.chatsService.createUser(createUserDto);
+
+      // Associate socket with user
+      this.connectedUsers.set(client.id, user.id);
+
+      // Notify client of successful user creation
+      client.emit('userCreated', user);
+
+      // Broadcast new user to all clients
+      this.server.emit('newUser', user);
+
+      return { success: true, user };
+    } catch (error) {
+      this.logger.error(`Error creating user: ${error.message}`);
+      return { success: false, message: error.message };
+    }
+  }
+
+  @SubscribeMessage('login')
+  async login(
+    @MessageBody() loginData: { userId?: string; userData?: CreateUserDto },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      let user;
+
+      if (loginData.userId) {
+        // Try to find existing user first by ID
+        user = await this.chatsService.findOneUser(loginData.userId);
+      }
+
+      // If user not found by ID but name is provided, try to find by name
+      if (!user && loginData.userData?.name) {
+        const existingUser = await this.chatsService.findUserByName(
+          loginData.userData.name,
+        );
+
+        if (existingUser) {
+          this.logger.log(
+            `Found existing user with name: ${loginData.userData.name}`,
+          );
+          user = existingUser;
+
+          // Optionally update the user's color if it was provided and different
+          if (
+            loginData.userData.color &&
+            loginData.userData.color !== existingUser.color
+          ) {
+            // If you want to update the user's color, you would need to add an update method
+            // to your ChatsService and call it here
+          }
+        }
+      }
+
+      // If user still not found and we have user data, create a new user
+      if (!user && loginData.userData) {
+        user = await this.chatsService.createUser(loginData.userData);
+        this.logger.log(`New user created during login: ${user.id}`);
+      } else if (!user) {
+        // Neither userId worked, nor user found by name, nor userData provided
+        client.emit('loginError', {
+          message: 'User not found and no user data provided for creation',
+        });
+        return {
+          success: false,
+          message: 'User not found and no creation data provided',
+        };
+      }
+
+      // Associate socket with user
+      this.connectedUsers.set(client.id, user.id);
+
+      // Notify client of successful login
+      client.emit('loginSuccess', user);
+
+      // Broadcast user joined
+      this.server.emit('userJoined', user);
+
+      return { success: true, user };
+    } catch (error) {
+      this.logger.error(`Error logging in: ${error.message}`);
+      return { success: false, message: error.message };
+    }
   }
 
   @SubscribeMessage('createChat')
@@ -45,7 +151,19 @@ export class ChatsGateway
     @MessageBody() createChatDto: CreateChatDto,
     @ConnectedSocket() client: Socket,
   ) {
-    const chat = await this.chatsService.create(createChatDto);
+    const userId = this.connectedUsers.get(client.id);
+
+    if (!userId) {
+      client.emit('error', {
+        message: 'You must be logged in to send messages',
+      });
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    // Attach the author ID from the connected users map
+    const chatWithAuthor = { ...createChatDto, authorId: userId };
+
+    const chat = await this.chatsService.create(chatWithAuthor);
     this.server.emit('newChat', chat);
     return chat;
   }
@@ -65,5 +183,27 @@ export class ChatsGateway
     const chat = await this.chatsService.remove(id);
     this.server.emit('chatRemoved', { id });
     return chat;
+  }
+
+  @SubscribeMessage('findAllUsers')
+  async findAllUsers() {
+    return this.chatsService.findAllUsers();
+  }
+
+  @SubscribeMessage('findOneUser')
+  async findOneUser(@MessageBody() id: string) {
+    return this.chatsService.findOneUser(id);
+  }
+
+  @SubscribeMessage('whoami')
+  async whoAmI(@ConnectedSocket() client: Socket) {
+    const userId = this.connectedUsers.get(client.id);
+
+    if (!userId) {
+      return { authenticated: false };
+    }
+
+    const user = await this.chatsService.findOneUser(userId);
+    return { authenticated: true, user };
   }
 }

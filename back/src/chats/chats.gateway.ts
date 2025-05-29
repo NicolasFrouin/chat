@@ -25,6 +25,7 @@ export class ChatsGateway
 {
   private logger: Logger = new Logger('ChatsGateway');
   private readonly connectedUsers = new Map<string, string>(); // Map socket.id to user.id
+  private readonly typingUsers = new Map<string, string>(); // Map user.id to socket.id
 
   @WebSocketServer()
   server: Server;
@@ -51,6 +52,14 @@ export class ChatsGateway
     const userId = this.connectedUsers.get(client.id);
     if (userId) {
       this.connectedUsers.delete(client.id);
+
+      // Also remove from typing users if they were typing
+      if (this.typingUsers.has(userId)) {
+        this.typingUsers.delete(userId);
+        // Notify others that user is no longer typing
+        this.server.emit('userStoppedTyping', { userId });
+      }
+
       this.logger.log(`User disconnected: ${userId}`);
 
       // Broadcast user left message
@@ -233,5 +242,47 @@ export class ChatsGateway
 
       return { error: error.message };
     }
+  }
+
+  @SubscribeMessage('startTyping')
+  async handleStartTyping(@ConnectedSocket() client: Socket) {
+    const userId = this.connectedUsers.get(client.id);
+    if (!userId) {
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    try {
+      const user = await this.chatsService.findOneUser(userId);
+      if (!user) {
+        return { success: false, message: 'User not found' };
+      }
+
+      // Mark user as typing
+      this.typingUsers.set(userId, client.id);
+
+      // Broadcast to all clients that this user is typing
+      this.server.emit('userTyping', { userId, userName: user.name });
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error(`Error handling typing start: ${error.message}`);
+      return { success: false, message: error.message };
+    }
+  }
+
+  @SubscribeMessage('stopTyping')
+  handleStopTyping(@ConnectedSocket() client: Socket) {
+    const userId = this.connectedUsers.get(client.id);
+    if (!userId) {
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    // Remove user from typing list
+    this.typingUsers.delete(userId);
+
+    // Broadcast to all clients that this user stopped typing
+    this.server.emit('userStoppedTyping', { userId });
+
+    return { success: true };
   }
 }

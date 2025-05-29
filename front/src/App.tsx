@@ -13,6 +13,7 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
 
   // Check local storage for saved user
   useEffect(() => {
@@ -109,6 +110,19 @@ function App() {
       setLoading(false);
     });
 
+    // Handle user typing events
+    socketInstance.on('userTyping', ({ userId, userName }) => {
+      setTypingUsers(prev => ({ ...prev, [userId]: userName }));
+    });
+
+    socketInstance.on('userStoppedTyping', ({ userId }) => {
+      setTypingUsers(prev => {
+        const newTypingUsers = { ...prev };
+        delete newTypingUsers[userId];
+        return newTypingUsers;
+      });
+    });
+
     return () => {
       socketInstance.disconnect();
     };
@@ -153,6 +167,20 @@ function App() {
     }
   };
 
+  // Function to handle user typing start
+  const handleTypingStart = () => {
+    if (socket && connected && user) {
+      socket.emit('startTyping');
+    }
+  };
+
+  // Function to handle user typing stop
+  const handleTypingStop = () => {
+    if (socket && connected && user) {
+      socket.emit('stopTyping');
+    }
+  };
+
   return (
     <AppShell>
       <Container
@@ -173,6 +201,9 @@ function App() {
             connected={connected}
             onLogout={handleLogout}
             onUpdateColor={updateUserColor}
+            typingUsers={typingUsers}
+            onTypingStart={handleTypingStart}
+            onTypingStop={handleTypingStop}
           />
         ) : (
           <UserForm

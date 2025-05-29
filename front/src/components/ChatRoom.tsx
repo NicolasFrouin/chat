@@ -5,6 +5,7 @@ import { useDisclosure } from '@mantine/hooks';
 
 import MessageBubble from './MessageBubble';
 import ColorPickerModal from './ColorPickerModal';
+import EmojiSelector from './EmojiSelector';
 import { Message, User } from '../types';
 
 interface ChatRoomProps {
@@ -34,6 +35,7 @@ function ChatRoom({
   const viewport = useRef<HTMLDivElement>(null);
   const [opened, { open, close }] = useDisclosure(false);
   const typingTimeoutRef = useRef<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +73,16 @@ function ChatRoom({
       }
       onTypingStop();
     }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessageText((prev) => prev + emoji);
+    // Focus the input after emoji selection
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 10);
   };
 
   // Clean up typing timeout on unmount
@@ -212,6 +224,10 @@ function ChatRoom({
             value={messageText}
             onChange={handleInputChange}
             disabled={!connected}
+            ref={inputRef}
+            rightSection={
+              <EmojiSelector onEmojiSelect={handleEmojiSelect} />
+            }
           />
           <Button
             type='submit'

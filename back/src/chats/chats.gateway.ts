@@ -14,6 +14,7 @@ import { Logger } from '@nestjs/common';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UsersService } from 'src/users/users.service';
+import { User } from 'generated/prisma';
 
 @WebSocketGateway({
   cors: {
@@ -98,7 +99,7 @@ export class ChatsGateway
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      let user;
+      let user: User | null = null;
 
       if (loginData.userId) {
         // Try to find existing user first by ID

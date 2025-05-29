@@ -1,4 +1,4 @@
-import { Stack, TextInput, Button, Text, Paper, ScrollArea, Group, ActionIcon } from '@mantine/core';
+import { Stack, TextInput, Button, Text, Paper, ScrollArea, Group, ActionIcon, Box } from '@mantine/core';
 import { useState, useRef, useEffect } from 'react';
 import { IconSend, IconLogout, IconPalette } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
@@ -82,13 +82,6 @@ function ChatRoom({
     };
   }, []);
 
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    if (viewport.current) {
-      viewport.current.scrollTo({ top: viewport.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [messages.length]);
-
   // Create typing indicator message
   const typingUsersArray = Object.values(typingUsers).filter((name) => name !== user.name);
   let typingMessage = '';
@@ -103,11 +96,24 @@ function ChatRoom({
     } more are typing...`;
   }
 
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (viewport.current) {
+      setTimeout(() => {
+        viewport.current?.scrollTo({
+          top: viewport.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      }, 50);
+    }
+  }, [messages.length, typingMessage]);
+
   return (
-    <Stack h='70vh'>
+    <Box h='70vh' style={{ display: 'flex', flexDirection: 'column' }}>
       <Group
         justify='space-between'
-        mb={5}
+        mb={10}
+        style={{ flexShrink: 0 }}
       >
         <Group>
           <Text fw={700}>{user.name}</Text>
@@ -140,13 +146,20 @@ function ChatRoom({
 
       <Paper
         withBorder
-        p='xs'
-        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          marginBottom: 10,
+        }}
       >
         <ScrollArea
           h='100%'
           viewportRef={viewport}
-          style={{ flex: 1 }}
+          scrollbarSize={8}
+          type='auto'
+          offsetScrollbars
         >
           <Stack
             gap='md'
@@ -177,6 +190,11 @@ function ChatRoom({
             fs='italic'
             p='xs'
             c='dimmed'
+            style={{
+              borderTop: '1px solid var(--mantine-color-gray-3)',
+              backgroundColor: 'var(--mantine-color-gray-0)',
+              flexShrink: 0,
+            }}
           >
             {typingMessage}
           </Text>
@@ -185,7 +203,7 @@ function ChatRoom({
 
       <form
         onSubmit={handleSubmit}
-        style={{ width: '100%' }}
+        style={{ width: '100%', flexShrink: 0 }}
       >
         <Group align='flex-start'>
           <TextInput
@@ -210,7 +228,7 @@ function ChatRoom({
         currentColor={user.color}
         onColorChange={onUpdateColor}
       />
-    </Stack>
+    </Box>
   );
 }
 

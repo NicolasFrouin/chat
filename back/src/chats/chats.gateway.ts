@@ -286,4 +286,50 @@ export class ChatsGateway
 
     return { success: true };
   }
+
+  @SubscribeMessage('updateChat')
+  async updateChat(
+    @MessageBody() updateData: { id: string; text: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.connectedUsers.get(client.id);
+
+    if (!userId) {
+      client.emit('error', {
+        message: 'You must be logged in to edit messages',
+      });
+      return { success: false, message: 'Not authenticated' };
+    }
+
+    try {
+      // First check if the message exists and belongs to the user
+      const chat = await this.chatsService.findOne(updateData.id);
+
+      if (!chat) {
+        client.emit('error', { message: 'Message not found' });
+        return { success: false, message: 'Message not found' };
+      }
+
+      if (chat.author.id !== userId) {
+        client.emit('error', {
+          message: 'You can only edit your own messages',
+        });
+        return { success: false, message: 'Unauthorized' };
+      }
+
+      // Update the message
+      const updatedChat = await this.chatsService.update(
+        updateData.id,
+        updateData.text,
+      );
+      this.server.emit('chatUpdated', updatedChat);
+      return updatedChat;
+    } catch (error) {
+      this.logger.error(`Error updating chat: ${error.message}`);
+      client.emit('error', {
+        message: error.message || 'Failed to update message',
+      });
+      return { success: false, message: error.message };
+    }
+  }
 }

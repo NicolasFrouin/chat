@@ -81,6 +81,14 @@ function App() {
       setMessages((prevMessages) => [...prevMessages, newMessage]);
     });
 
+    socketInstance.on('chatUpdated', (updatedMessage: Message) => {
+      setMessages((prevMessages) => 
+        prevMessages.map((msg) => 
+          msg.id === updatedMessage.id ? updatedMessage : msg
+        )
+      );
+    });
+
     socketInstance.on('chatRemoved', (data: { id: string }) => {
       setMessages((prevMessages) => prevMessages.filter((message) => message.id !== data.id));
     });
@@ -148,6 +156,13 @@ function App() {
     }
   };
 
+  // Function to edit a message
+  const editMessage = (messageId: string, newText: string) => {
+    if (socket && connected) {
+      socket.emit('updateChat', { id: messageId, text: newText });
+    }
+  };
+
   // Function to handle logout
   const handleLogout = () => {
     localStorage.removeItem('chatUser');
@@ -204,6 +219,7 @@ function App() {
             typingUsers={typingUsers}
             onTypingStart={handleTypingStart}
             onTypingStop={handleTypingStop}
+            onEditMessage={editMessage} // Pass the edit message handler
           />
         ) : (
           <UserForm

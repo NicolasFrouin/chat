@@ -18,6 +18,7 @@ interface ChatRoomProps {
   typingUsers: Record<string, string>; // Map of userId to username
   onTypingStart: () => void;
   onTypingStop: () => void;
+  onEditMessage: (messageId: string, newText: string) => void; // Add this prop
 }
 
 function ChatRoom({
@@ -30,6 +31,7 @@ function ChatRoom({
   typingUsers,
   onTypingStart,
   onTypingStop,
+  onEditMessage, // Include in destructuring
 }: ChatRoomProps) {
   const [messageText, setMessageText] = useState('');
   const viewport = useRef<HTMLDivElement>(null);
@@ -85,6 +87,12 @@ function ChatRoom({
     }, 10);
   };
 
+  const handleEditMessage = (messageId: string, newText: string) => {
+    if (connected) {
+      onEditMessage(messageId, newText);
+    }
+  };
+
   // Clean up typing timeout on unmount
   useEffect(() => {
     return () => {
@@ -121,7 +129,10 @@ function ChatRoom({
   }, [messages.length, typingMessage]);
 
   return (
-    <Box h='70vh' style={{ display: 'flex', flexDirection: 'column' }}>
+    <Box
+      h='70vh'
+      style={{ display: 'flex', flexDirection: 'column' }}
+    >
       <Group
         justify='space-between'
         mb={10}
@@ -190,6 +201,7 @@ function ChatRoom({
                   key={message.id}
                   message={message}
                   isCurrentUser={message.author.id === user.id}
+                  onEditMessage={message.author.id === user.id ? handleEditMessage : undefined}
                 />
               ))
             )}
@@ -225,9 +237,7 @@ function ChatRoom({
             onChange={handleInputChange}
             disabled={!connected}
             ref={inputRef}
-            rightSection={
-              <EmojiSelector onEmojiSelect={handleEmojiSelect} />
-            }
+            rightSection={<EmojiSelector onEmojiSelect={handleEmojiSelect} />}
           />
           <Button
             type='submit'

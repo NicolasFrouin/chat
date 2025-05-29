@@ -8,13 +8,12 @@ export interface User {
 export interface Message {
   id: string;
   text: string;
-  createdAt: string;
-  updatedAt: string;
   author: User;
+  createdAt: string;
+  modified: boolean;
 }
 
 export interface UserFormData {
   name: string;
   color: string;
-  image?: string;
 }

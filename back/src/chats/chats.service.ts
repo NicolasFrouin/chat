@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class ChatsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createChatDto: CreateChatDto) {
     return this.prisma.chat.create({
@@ -40,6 +40,25 @@ export class ChatsService {
     return this.prisma.chat.delete({
       where: { id },
     });
+  }
+
+  async update(id: string, text: string) {
+    const chat = await this.prisma.chat.update({
+      where: { id },
+      data: {
+        text,
+        modified: true,
+      },
+      include: {
+        author: true,
+      },
+    });
+
+    if (!chat) {
+      throw new NotFoundException(`Chat with id ${id} not found`);
+    }
+
+    return chat;
   }
 
   // User-related methods

@@ -1,80 +1,66 @@
-import { useRef, useEffect } from 'react';
-import { Paper, Title, Stack, Text, Group, Badge, Button, ScrollArea } from '@mantine/core';
-import { User, Message } from '../types';
-import MessageForm from './MessageForm';
+import { Stack, TextInput, Button, Text, Paper, ScrollArea, Group, ActionIcon } from '@mantine/core';
+import { useState, useRef, useEffect } from 'react';
+import { IconSend, IconLogout, IconPalette } from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
+
 import MessageBubble from './MessageBubble';
+import ColorPickerModal from './ColorPickerModal';
+import { Message, User } from '../types';
 
 interface ChatRoomProps {
   user: User;
   messages: Message[];
   onSendMessage: (text: string) => void;
-  onLogout: () => void;
   connected: boolean;
+  onLogout: () => void;
+  onUpdateColor: (color: string) => void;
 }
 
-function ChatRoom({ user, messages, onSendMessage, onLogout, connected }: ChatRoomProps) {
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+function ChatRoom({ user, messages, onSendMessage, connected, onLogout, onUpdateColor }: ChatRoomProps) {
+  const [messageText, setMessageText] = useState('');
+  const viewport = useRef<HTMLDivElement>(null);
+  const [opened, { open, close }] = useDisclosure(false);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (messageText.trim() && connected) {
+      onSendMessage(messageText.trim());
+      setMessageText('');
     }
-  }, [messages]);
+  };
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (viewport.current) {
+      viewport.current.scrollTo({ top: viewport.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [messages.length]);
 
   return (
-    <Stack gap='md'>
-      <Group
-        justify='space-between'
-        align='center'
-      >
-        <Title order={3}>Chat Room</Title>
-        <Group gap='sm'>
-          <Text size='sm'>
-            Logged in as <strong>{user.name}</strong>
-          </Text>
-          <Badge
-            color={connected ? 'green' : 'red'}
-            variant='filled'
-          >
+    <Stack h="70vh">
+      <Group justify="space-between" mb={5}>
+        <Group>
+          <Text fw={700}>{user.name}</Text>
+          <ActionIcon color={user.color} variant="light" onClick={open} title="Change your color">
+            <IconPalette size="1.125rem" />
+          </ActionIcon>
+        </Group>
+        <Group>
+          <Text c="dimmed" size="xs">
             {connected ? 'Connected' : 'Disconnected'}
-          </Badge>
-          <Button
-            variant='subtle'
-            color='gray'
-            size='xs'
-            rightSection={'❌'}
-            onClick={onLogout}
-          >
-            Logout
-          </Button>
+          </Text>
+          <ActionIcon color="red" variant="light" onClick={onLogout} title="Logout">
+            <IconLogout size="1.125rem" />
+          </ActionIcon>
         </Group>
       </Group>
 
-      <Paper
-        withBorder
-        p='xs'
-        style={{ height: 'calc(100vh - 200px)' }}
-      >
-        <ScrollArea
-          h='100%'
-          viewportRef={scrollAreaRef}
-        >
-          <Stack
-            gap='xs'
-            p='xs'
-          >
+      <Paper withBorder p="xs" style={{ flex: 1 }}>
+        <ScrollArea h="100%" viewportRef={viewport}>
+          <Stack gap="md" p="xs">
             {messages.length === 0 ? (
-              <Text
-                c='dimmed'
-                ta='center'
-                py='xl'
-              >
-                No messages yet. Be the first to say hello!
-              </Text>
+              <Text c="dimmed" ta="center">No messages yet. Start the conversation!</Text>
             ) : (
               messages.map((message) => (
                 <MessageBubble
@@ -88,9 +74,26 @@ function ChatRoom({ user, messages, onSendMessage, onLogout, connected }: ChatRo
         </ScrollArea>
       </Paper>
 
-      <MessageForm
-        onSubmit={onSendMessage}
-        disabled={!connected}
+      <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+        <Group align="flex-start">
+          <TextInput
+            style={{ flex: 1 }}
+            placeholder="Type your message..."
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            disabled={!connected}
+          />
+          <Button type="submit" disabled={!connected || !messageText.trim()}>
+            <IconSend size="1.125rem" />
+          </Button>
+        </Group>
+      </form>
+
+      <ColorPickerModal
+        opened={opened}
+        close={close}
+        currentColor={user.color}
+        onColorChange={onUpdateColor}
       />
     </Stack>
   );

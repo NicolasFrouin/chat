@@ -13,6 +13,7 @@ import { ChatsService } from './chats.service';
 import { Logger } from '@nestjs/common';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UsersService } from 'src/users/users.service';
 
 @WebSocketGateway({
   cors: {
@@ -28,9 +29,12 @@ export class ChatsGateway
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly chatsService: ChatsService) {}
+  constructor(
+    private readonly chatsService: ChatsService,
+    private readonly usersService: UsersService,
+  ) {}
 
-  afterInit(server: Server) {
+  afterInit(_server: Server) {
     this.logger.log('WebSocket Gateway Initialized');
   }
 
@@ -205,5 +209,29 @@ export class ChatsGateway
 
     const user = await this.chatsService.findOneUser(userId);
     return { authenticated: true, user };
+  }
+
+  @SubscribeMessage('updateUserColor')
+  async handleUpdateUserColor(
+    @MessageBody() data: { userId: string; color: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      const updatedUser = await this.usersService.updateColor(
+        data.userId,
+        data.color,
+      );
+
+      this.server.emit('userUpdated', updatedUser);
+      client.emit('loginSuccess', updatedUser);
+
+      return updatedUser;
+    } catch (error) {
+      client.emit('updateError', {
+        message: error.message || 'Failed to update user color',
+      });
+
+      return { error: error.message };
+    }
   }
 }

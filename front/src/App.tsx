@@ -84,6 +84,31 @@ function App() {
       setMessages((prevMessages) => prevMessages.filter((message) => message.id !== data.id));
     });
 
+    // Handle user update events
+    socketInstance.on('userUpdated', (updatedUser: User) => {
+      // Update the current user if it's us
+      if (user && updatedUser.id === user.id) {
+        setUser(updatedUser);
+        localStorage.setItem('chatUser', JSON.stringify(updatedUser));
+      }
+      
+      // Update the user in any existing messages
+      setMessages((prevMessages) => 
+        prevMessages.map((message) => 
+          message.author.id === updatedUser.id 
+            ? { ...message, author: updatedUser } 
+            : message
+        )
+      );
+      
+      setLoading(false);
+    });
+
+    socketInstance.on('updateError', (data: { message: string }) => {
+      setError(data.message);
+      setLoading(false);
+    });
+
     return () => {
       socketInstance.disconnect();
     };
@@ -120,6 +145,14 @@ function App() {
     }
   };
 
+  // Function to update user color
+  const updateUserColor = (color: string) => {
+    if (socket && connected && user) {
+      setLoading(true);
+      socket.emit('updateUserColor', { userId: user.id, color });
+    }
+  };
+
   return (
     <AppShell>
       <Container
@@ -139,6 +172,7 @@ function App() {
             onSendMessage={sendMessage}
             connected={connected}
             onLogout={handleLogout}
+            onUpdateColor={updateUserColor}
           />
         ) : (
           <UserForm

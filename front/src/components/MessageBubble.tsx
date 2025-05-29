@@ -43,6 +43,8 @@ function MessageBubble({ message, isCurrentUser }: MessageBubbleProps) {
           c={isCurrentUser ? 'white' : 'dark'}
           style={{ 
             alignSelf: isCurrentUser ? 'flex-end' : 'flex-start',
+            borderLeft: !isCurrentUser ? `4px solid ${author.color}` : undefined,
+            borderRight: isCurrentUser ? `4px solid ${author.color}` : undefined,
           }}
         >
           <Text size="sm">{text}</Text>

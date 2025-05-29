@@ -32,6 +32,12 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        caughtErrors: 'none',
+        varsIgnorePattern: '^_',
+        args: 'after-used',
+      }],
       'prettier/prettier': [
         'warn',
         {

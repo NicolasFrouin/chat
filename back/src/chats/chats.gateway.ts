@@ -235,6 +235,7 @@ export class ChatsGateway
       this.server.emit('userUpdated', updatedUser);
       client.emit('loginSuccess', updatedUser);
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return updatedUser;
     } catch (error) {
       client.emit('updateError', {
